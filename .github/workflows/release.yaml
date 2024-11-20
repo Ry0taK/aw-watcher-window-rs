@@ -22,11 +22,11 @@ jobs:
           rustup target install x86_64-pc-windows-gnu
       - name: Compile
         run: |
-          cargo build --target x86_64-pc-windows-gnu
+          cargo build --release --target x86_64-pc-windows-gnu
       - name: Release
         uses: softprops/action-gh-release@01570a1f39cb168c169c802c3bceb9e93fb10974
         with:
           files: |
-            target/x86_64-pc-windows-gnu/debug/aw-watcher-window-rs.exe
+            target/x86_64-pc-windows-gnu/release/aw-watcher-window-rs.exe
           generate_release_notes: true
 

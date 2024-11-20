@@ -1,0 +1,13 @@
+[package]
+name = "aw-watcher-window-rs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+winsafe = {version = "0.0.22", features = ["user","kernel","dwm"]}
+aw-client-rust = { git = "https://github.com/ActivityWatch/aw-server-rust.git", rev = "a0cdef90cf86cd8d2cc89723f5751c1123ae7e2b"}
+serde_json = "1.0.133"
+chrono = "0.4.38"
+gethostname = "0.5.0"
+clap = { version = "4.5.21", features = ["derive"] }
+regex = "1.11.1"

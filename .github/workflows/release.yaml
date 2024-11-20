@@ -1,0 +1,32 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Release ${{ github.ref_name }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Setup
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mingw-w64
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          rustup target install x86_64-pc-windows-gnu
+      - name: Compile
+        run: |
+          cargo build --target x86_64-pc-windows-gnu
+      - name: Release
+        uses: softprops/action-gh-release@01570a1f39cb168c169c802c3bceb9e93fb10974
+        with:
+          files: |
+            target/x86_64-pc-windows-gnu/debug/aw-watcher-window-rs.exe
+          generate_release_notes: true
+

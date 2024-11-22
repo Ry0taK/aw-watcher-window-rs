@@ -21,7 +21,7 @@ if (-not $port) {
 }
 
 $executable = "aw-watcher-window-rs.exe"
-$args = "--hostname $hostname --port $port $excludeTitle"
+$args = "--host $hostname --port $port $excludeTitle"
 
 $Action = New-ScheduledTaskAction -Execute $executable -Argument $args
 $Trigger = New-ScheduledTaskTrigger -AtLogon -User $username

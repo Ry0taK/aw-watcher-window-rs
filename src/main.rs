@@ -3,8 +3,8 @@ use clap::Parser;
 use regex::Regex;
 use serde_json::{Map, Value};
 use std::path::PathBuf;
-use winsafe::{co, prelude::*, HPROCESS, HWND};
 use std::{thread, time};
+use winsafe::{co, prelude::*, HPROCESS, HWND};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -44,15 +44,22 @@ fn main() {
     let client =
         aw_client_rust::blocking::AwClient::new(&args.host, args.port, "aw-watcher-window-rs")
             .expect("Failed to create a client");
-    let window_bucket = format!("aw-watcher-window-rs_{}", hostname);
-    client
-        .create_bucket_simple(&window_bucket, "currentwindow")
-        .expect("Failed to create bucket");
     let exclude_title_processes = args
         .exclude_title_processes
         .iter()
         .map(|s| Regex::new(s).unwrap_or_else(|_| Regex::new(regex::escape(s).as_str()).unwrap()))
         .collect::<Vec<Regex>>();
+    let window_bucket = format!("aw-watcher-window-rs_{}", hostname);
+
+    loop {
+        match client.create_bucket_simple(&window_bucket, "currentwindow") {
+            Ok(_) => break,
+            Err(e) => {
+                eprintln!("Failed to create bucket: {}. Retrying...", e);
+                thread::sleep(time::Duration::from_millis(1000));
+            }
+        }
+    }
 
     loop {
         thread::sleep(time::Duration::from_millis(args.poll_time.into()));

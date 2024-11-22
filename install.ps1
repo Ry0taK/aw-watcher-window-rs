@@ -1,9 +1,15 @@
 $username = if ($args[0]) { $args[0] } else { $env:USERNAME }
+$executable = if ($args[1]) { $args[1] } else { (Get-Command "aw-watcher-window-rs.exe" -ErrorAction SilentlyContinue).Path }
+if (-not $executable) {
+    Write-Error "aw-watcher-window-rs.exe not found in PATH"
+    Pause
+    Exit 1
+}
 
 if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
     Write-Warning "This script requires administrative privileges. Attempting to elevate..."
 
-    Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" $username" -Verb RunAs
+    Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" `"$username`" `"$executable`"" -Verb RunAs
     Exit
 }
 
@@ -20,12 +26,11 @@ if (-not $port) {
     $port = 5600
 }
 
-$executable = "aw-watcher-window-rs.exe"
 $args = "--host $hostname --port $port $excludeTitle"
 
 $Action = New-ScheduledTaskAction -Execute $executable -Argument $args
 $Trigger = New-ScheduledTaskTrigger -AtLogon -User $username
-$Principal = New-ScheduledTaskPrincipal -UserId $username -RunLevel Highest
+$Principal = New-ScheduledTaskPrincipal -UserId $username -RunLevel Limited
 $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit 0
 
 Register-ScheduledTask -TaskName "aw-watcher-window-rs-$username" `

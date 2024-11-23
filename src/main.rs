@@ -27,8 +27,11 @@ struct Args {
     #[arg(long, default_value_t = false, help = "Disable title reporting")]
     exclude_title: bool,
 
-    #[arg(short, long, num_args = 1.., value_delimiter = ',', help = "Comma-separated list of regex patterns that matches process names (e.g., Firefox.exe) to scrub titles from")]
+    #[arg(short, long, num_args = 1.., value_delimiter = ',', help = "Comma-separated list of regex patterns that matches process names (e.g., Firefox.exe) to exclude titles from")]
     exclude_title_processes: Vec<String>,
+
+    #[arg(short, long, num_args = 1.., value_delimiter = ',', help = "Override the exclusion rule for processes with regex patterns")]
+    include_title_processes: Vec<String>,
 
     #[arg(long, default_value_t = 5000, help = "Poll time in milliseconds")]
     poll_time: u32,
@@ -47,6 +50,11 @@ fn main() {
             .expect("Failed to create a client");
     let exclude_title_processes = args
         .exclude_title_processes
+        .iter()
+        .map(|s| Regex::new(s).unwrap_or_else(|_| Regex::new(regex::escape(s).as_str()).unwrap()))
+        .collect::<Vec<Regex>>();
+    let include_title_processes = args
+        .include_title_processes
         .iter()
         .map(|s| Regex::new(s).unwrap_or_else(|_| Regex::new(regex::escape(s).as_str()).unwrap()))
         .collect::<Vec<Regex>>();
@@ -115,8 +123,11 @@ fn main() {
         data.insert("app".to_string(), Value::String(process_name.to_string()));
         data.insert(
             "title".to_string(),
-            if args.exclude_title
+            if (args.exclude_title
                 || exclude_title_processes
+                    .iter()
+                    .any(|r| r.is_match(&process_name.to_string())))
+                && !include_title_processes
                     .iter()
                     .any(|r| r.is_match(&process_name.to_string()))
             {

@@ -70,6 +70,9 @@ fn main() {
         }
     }
 
+    let mut prev_app = String::new();
+    let mut prev_title = String::new();
+
     loop {
         thread::sleep(time::Duration::from_millis(args.poll_time.into()));
         let active_window = match HWND::GetForegroundWindow() {
@@ -119,37 +122,83 @@ fn main() {
             }
         };
 
-        let mut data = Map::new();
-        data.insert("app".to_string(), Value::String(process_name.to_string()));
-        data.insert(
-            "title".to_string(),
-            if (args.exclude_title
-                || exclude_title_processes
-                    .iter()
-                    .any(|r| r.is_match(&process_name.to_string())))
-                && !include_title_processes
-                    .iter()
-                    .any(|r| r.is_match(&process_name.to_string()))
-            {
-                Value::String(process_name.to_string())
-            } else {
-                Value::String(window_title)
-            },
-        );
-
-        if args.debug {
-            println!("Logging event: {:?}", data);
-        }
-        let event = aw_client_rust::Event {
-            id: None,
-            timestamp: Utc::now(),
-            duration: Duration::seconds(0),
-            data,
+        let app = process_name.to_string();
+        let title = if (args.exclude_title
+            || exclude_title_processes
+                .iter()
+                .any(|r| r.is_match(&process_name.to_string())))
+            && !include_title_processes
+                .iter()
+                .any(|r| r.is_match(&process_name.to_string()))
+        {
+            process_name.to_string()
+        } else {
+            window_title
         };
 
-        if let Err(e) = client.heartbeat(&window_bucket, &event, (args.poll_time + 1000).into()) {
-            eprintln!("Failed to send heartbeat: {}", e);
+        if app == prev_app && title == prev_title {
+            let mut data = Map::new();
+            data.insert("app".to_string(), Value::String(app.clone()));
+            data.insert("title".to_string(), Value::String(title.clone()));
+            match ping(data, &client, &window_bucket, Utc::now(), &args) {
+                Ok(_) => (),
+                Err(e) => eprintln!("Failed to send heartbeat: {}", e),
+            }
             continue;
         }
+
+        let mut prev_data = Map::new();
+        prev_data.insert("app".to_string(), Value::String(prev_app.clone()));
+        prev_data.insert("title".to_string(), Value::String(prev_title.clone()));
+
+        let now = Utc::now();
+
+        match ping(
+            prev_data,
+            &client,
+            &window_bucket,
+            now - Duration::milliseconds(1),
+            &args,
+        ) {
+            Ok(_) => (),
+            Err(e) => {
+                eprintln!("Failed to send heartbeat: {}", e);
+                continue;
+            }
+        }
+
+        let mut new_data = Map::new();
+        new_data.insert("app".to_string(), Value::String(app.clone()));
+        new_data.insert("title".to_string(), Value::String(title.clone()));
+        match ping(new_data, &client, &window_bucket, now, &args) {
+            Ok(_) => (),
+            Err(e) => {
+                eprintln!("Failed to send heartbeat: {}", e);
+                continue;
+            }
+        }
+
+        prev_app = app;
+        prev_title = title;
     }
+}
+
+fn ping(
+    data: Map<String, Value>,
+    client: &aw_client_rust::blocking::AwClient,
+    bucket: &str,
+    timestamp: chrono::DateTime<Utc>,
+    args: &Args,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if args.debug {
+        println!("Logging event: {:?}", data);
+    }
+    let event = aw_client_rust::Event {
+        id: None,
+        timestamp,
+        duration: Duration::seconds(0),
+        data,
+    };
+    client.heartbeat(bucket, &event, (args.poll_time + 1000) as f64)?;
+    Ok(())
 }
